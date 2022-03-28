@@ -52,6 +52,7 @@ typedef struct LibRTMPContext {
     int live;
     char *temp_filename;
     int buffer_size;
+    bool strict_paths;
 } LibRTMPContext;
 
 static void rtmp_log(int level, const char *fmt, va_list args)
@@ -333,6 +334,7 @@ static const AVOption options[] = {
     {"rtmp_swfurl", "URL of the SWF player. By default no value will be sent", OFFSET(swfurl), AV_OPT_TYPE_STRING, {.str = NULL }, 0, 0, DEC|ENC},
     {"rtmp_swfverify", "URL to player swf file, compute hash/size automatically. (unimplemented)", OFFSET(swfverify), AV_OPT_TYPE_STRING, {.str = NULL }, 0, 0, DEC},
     {"rtmp_tcurl", "URL of the target stream. Defaults to proto://host[:port]/app.", OFFSET(tcurl), AV_OPT_TYPE_STRING, {.str = NULL }, 0, 0, DEC|ENC},
+    {"rtmp_strict_paths", "Error instead of warn for mismatch on stream or application path in url", OFFSET(strict_paths), AV_OPT_TYPE_BOOL, {.i64 = 0 }, 0, 1, DEC},
 #if CONFIG_NETWORK
     {"rtmp_buffer_size", "set buffer size in bytes", OFFSET(buffer_size), AV_OPT_TYPE_INT, {.i64 = -1}, -1, INT_MAX, DEC|ENC },
 #endif

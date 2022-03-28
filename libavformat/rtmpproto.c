@@ -132,6 +132,7 @@ typedef struct RTMPContext {
     char          auth_params[500];
     int           do_reconnect;
     int           auth_tried;
+    int           strict_paths;               ///< If true, enforce strict string matching on rtmp stream and application
 } RTMPContext;
 
 #define PLAYER_KEY_OPEN_PART_LEN 30   ///< length of partial key used for first client digest signing
@@ -480,9 +481,16 @@ static int read_connect(URLContext *s, RTMPContext *rt)
                                  "app", tmpstr, sizeof(tmpstr));
     if (ret)
         av_log(s, AV_LOG_WARNING, "App field not found in connect\n");
-    if (!ret && strcmp(tmpstr, rt->app))
-        av_log(s, AV_LOG_WARNING, "App field don't match up: %s <-> %s\n",
-               tmpstr, rt->app);
+    if (!ret && strcmp(tmpstr, rt->app)) {
+        if (rt->strict_paths) {
+            av_log(s, AV_LOG_ERROR, "App field don't match up: %s <-> %s. "
+               "Exiting since rtmp_strict_paths provided\n", tmpstr, rt->app);
+            return AVERROR(EIO);
+        } else {
+            av_log(s, AV_LOG_WARNING, "App field don't match up: %s <-> %s\n",
+                tmpstr, rt->app);
+        }
+    }
     ff_rtmp_packet_destroy(&pkt);
 
     // Send Window Acknowledgement Size (as defined in specification)
@@ -1947,9 +1955,16 @@ static int send_invoke_response(URLContext *s, RTMPPacket *pkt)
                 pchar = s->filename;
             }
             pchar++;
-            if (strcmp(pchar, filename))
-                av_log(s, AV_LOG_WARNING, "Unexpected stream %s, expecting"
-                       " %s\n", filename, pchar);
+            if (strcmp(pchar, filename)) {
+                if (rt->strict_paths) {
+                    av_log(s, AV_LOG_ERROR, "Unexpected stream %s, expecting %s. "
+                        "Exiting since rtmp_strict_paths provided.\n", filename, pchar);
+                    return AVERROR(EIO);
+                } else {
+                    av_log(s, AV_LOG_WARNING, "Unexpected stream %s, expecting"
+                        " %s\n", filename, pchar);
+                }
+            }
         }
         rt->state = STATE_RECEIVING;
     }
@@ -3119,6 +3134,7 @@ static const AVOption rtmp_options[] = {
     {"listen",      "Listen for incoming rtmp connections", OFFSET(listen), AV_OPT_TYPE_INT, {.i64 = 0}, INT_MIN, INT_MAX, DEC, "rtmp_listen" },
     {"tcp_nodelay", "Use TCP_NODELAY to disable Nagle's algorithm", OFFSET(tcp_nodelay), AV_OPT_TYPE_INT, {.i64 = 0}, 0, 1, DEC|ENC},
     {"timeout", "Maximum timeout (in seconds) to wait for incoming connections. -1 is infinite. Implies -rtmp_listen 1",  OFFSET(listen_timeout), AV_OPT_TYPE_INT, {.i64 = -1}, INT_MIN, INT_MAX, DEC, "rtmp_listen" },
+    "rtmp_strict_paths", "Error instead of warn for mismatch on stream or application path in url", OFFSET(strict_paths), AV_OPT_TYPE_BOOL, {.i64 = 0 }, 0, 1, DEC},
     { NULL },
 };
 
